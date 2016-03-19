@@ -12,7 +12,14 @@ class DrawView : UIView {
     //MARK: - properties
     var currentLine = [NSValue: Line]()
     var finishedLines = [Line]()
-    var selectedLineIndex : Int?
+    var selectedLineIndex : Int? {
+        didSet {
+            if selectedLineIndex == nil {
+                let menu = UIMenuController.sharedMenuController()
+                menu.setMenuVisible(false, animated: true)
+            }
+        }
+    }
     
     @IBInspectable var finishedLineColor : UIColor = UIColor.blackColor() {
         didSet {
@@ -61,6 +68,24 @@ class DrawView : UIView {
         print("recognized a tap")
         let point = gestureRecognizer.locationInView(self)
         selectedLineIndex = indexOfLineAtPoint(point)
+        
+        //create menu item
+        let menu = UIMenuController.sharedMenuController()
+        if selectedLineIndex != nil {
+            //make drawView the target of menu action
+            becomeFirstResponder()
+            //create a new Delete menu item
+            let deleteItem = UIMenuItem(title: "Delete", action: "deleteLine:")
+            menu.menuItems = [deleteItem]
+            //tell menu its location
+            menu.setTargetRect(CGRect(x: point.x, y: point.y, width: 2, height: 2), inView: self)
+            menu.setMenuVisible(true, animated: true)
+        }
+        else {
+            menu.setMenuVisible(false, animated: true)
+
+        }
+        
         
         setNeedsDisplay()
     }
@@ -118,6 +143,16 @@ class DrawView : UIView {
         
     }
     
+    func deleteLine(sender: AnyObject) {
+        //remove the selected line from finishedLines
+        if let index = selectedLineIndex {
+            finishedLines.removeAtIndex(index)
+            selectedLineIndex = nil
+            
+            setNeedsDisplay()
+        }
+    }
+    
     //MARK: - touch events
     override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
         
@@ -165,6 +200,9 @@ class DrawView : UIView {
         setNeedsDisplay()
     }
     
-    
+    //MARK: - other override
+    override func canBecomeFirstResponder() -> Bool {
+        return true
+    }
     
 }
