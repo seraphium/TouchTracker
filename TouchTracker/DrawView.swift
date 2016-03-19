@@ -9,8 +9,10 @@
 import UIKit
 
 class DrawView : UIView {
+    //MARK: - properties
     var currentLine = [NSValue: Line]()
     var finishedLines = [Line]()
+    var selectedLineIndex : Int?
     
     @IBInspectable var finishedLineColor : UIColor = UIColor.blackColor() {
         didSet {
@@ -30,6 +32,7 @@ class DrawView : UIView {
         }
     }
     
+    //MARK: - init
     required init?(coder aCoder:NSCoder) {
         super.init(coder: aCoder)
         let doubleTapRecognizer = UITapGestureRecognizer(target: self, action: "doubleTap:")
@@ -37,15 +40,32 @@ class DrawView : UIView {
         doubleTapRecognizer.delaysTouchesBegan = true
         addGestureRecognizer(doubleTapRecognizer)
         
+        let tapRecognizer = UITapGestureRecognizer(target: self, action: "tap:")
+        tapRecognizer.delaysTouchesBegan = true
+        tapRecognizer.requireGestureRecognizerToFail(doubleTapRecognizer)
+        addGestureRecognizer(tapRecognizer)
     }
     
+    //MARK: - tap handler
+    //handling all clear
     func doubleTap(gestureRecognizer:UIGestureRecognizer) {
         print ("recognized double tap")
+        selectedLineIndex = nil
         currentLine.removeAll(keepCapacity: false)
         finishedLines.removeAll(keepCapacity: false)
         setNeedsDisplay()
     }
     
+    //handling line selection
+    func tap(gestureRecognizer:UIGestureRecognizer) {
+        print("recognized a tap")
+        let point = gestureRecognizer.locationInView(self)
+        selectedLineIndex = indexOfLineAtPoint(point)
+        
+        setNeedsDisplay()
+    }
+    
+    //MARK: - draw events
     func strokeLine(line: Line) {
         let path = UIBezierPath()
         path.lineWidth = lineThickness
@@ -57,20 +77,48 @@ class DrawView : UIView {
     }
     
     override func drawRect(rect: CGRect) {
-        //draw finished lines in black
+        
+        //draw finished lines
         finishedLineColor.setStroke()
         for line in finishedLines {
             strokeLine(line)
         }
-        
+        //draw current lines
         currentLineColor.setStroke()
         for (_, line) in currentLine {
             strokeLine(line)
         }
         
+        //draw selected line
+        if let index = selectedLineIndex {
+            UIColor.greenColor().setStroke()
+            let selectedLine = finishedLines[index]
+            strokeLine(selectedLine)
+        }
+    }
+    
+    func indexOfLineAtPoint(point: CGPoint) -> Int? {
+        //Find a line close to point
+        for (index, line) in finishedLines.enumerate() {
+            let begin = line.begin
+            let end = line.end
+            
+            //check a few points on the line
+            for t in CGFloat(0).stride(to: 1.0, by: 0.05) {
+                let x = begin.x + ((end.x - begin.x) * t)
+                let y = begin.y + ((end.y - begin.y) * t)
+                if hypot(x - point.x, y - point.y) < 20 {
+                    return index
+                }
+            }
+        }
+    
+        return nil
+            
         
     }
     
+    //MARK: - touch events
     override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
         
         print (__FUNCTION__)
