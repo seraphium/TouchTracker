@@ -8,7 +8,7 @@
 
 import UIKit
 
-class DrawView : UIView {
+class DrawView : UIView, UIGestureRecognizerDelegate {
     //MARK: - properties
     var currentLine = [NSValue: Line]()
     var finishedLines = [Line]()
@@ -44,16 +44,27 @@ class DrawView : UIView {
         super.init(coder: aCoder)
         let doubleTapRecognizer = UITapGestureRecognizer(target: self, action: "doubleTap:")
         doubleTapRecognizer.numberOfTapsRequired = 2
-        doubleTapRecognizer.delaysTouchesBegan = true
+        //TODO: must disable delayTouches and set selectedLineIndex to nil to avoid touchBegin after menu
+        //selected cause selected line move. need a more elegent solution
+
+       // doubleTapRecognizer.delaysTouchesBegan = true
         addGestureRecognizer(doubleTapRecognizer)
         
         let tapRecognizer = UITapGestureRecognizer(target: self, action: "tap:")
-        tapRecognizer.delaysTouchesBegan = true
+        //tapRecognizer.delaysTouchesBegan = true
         tapRecognizer.requireGestureRecognizerToFail(doubleTapRecognizer)
         addGestureRecognizer(tapRecognizer)
+        
+        let longPressRecognizer = UILongPressGestureRecognizer(target: self, action: "longPress:")
+        addGestureRecognizer(longPressRecognizer)
+        
+        let moveRecognizer = UIPanGestureRecognizer(target: self, action: "moveLine:")
+        moveRecognizer.cancelsTouchesInView = false
+        moveRecognizer.delegate = self
+        addGestureRecognizer(moveRecognizer)
     }
     
-    //MARK: - tap handler
+    //MARK: - gesture handler
     //handling all clear
     func doubleTap(gestureRecognizer:UIGestureRecognizer) {
         print ("recognized double tap")
@@ -89,6 +100,23 @@ class DrawView : UIView {
         
         setNeedsDisplay()
     }
+    
+    //handling long press moving
+    func longPress(gestureRecognizer:UIGestureRecognizer) {
+        print ("recognized long press")
+        if gestureRecognizer.state == .Began {
+            let point = gestureRecognizer.locationInView(self)
+            selectedLineIndex = indexOfLineAtPoint(point)
+           if selectedLineIndex != nil {
+                currentLine.removeAll(keepCapacity: false)
+            }
+        } else if gestureRecognizer.state == .Ended {
+            selectedLineIndex = nil
+        }
+        setNeedsDisplay()
+    }
+    
+
     
     //MARK: - draw events
     func strokeLine(line: Line) {
@@ -153,10 +181,34 @@ class DrawView : UIView {
         }
     }
     
+    //handling moving
+    func moveLine(gestureRecognizer:UIPanGestureRecognizer) {
+        print ("recognized a pan")
+        //if a line is selected
+        if let index = selectedLineIndex {
+            if gestureRecognizer.state == .Changed {
+                let transition = gestureRecognizer.translationInView(self)
+                //add the transition value to selected line's position
+                finishedLines[index].begin.x += transition.x
+                finishedLines[index].begin.y += transition.y
+                finishedLines[index].end.x += transition.x
+                finishedLines[index].end.y += transition.y
+                //use the delta value compared to the last call value
+                gestureRecognizer.setTranslation(CGPoint.zero, inView: self)
+                
+                setNeedsDisplay()
+                
+            } else {
+                return
+            }
+            
+        }
+        
+    }
     //MARK: - touch events
     override func touchesBegan(touches: Set<UITouch>, withEvent event: UIEvent?) {
-        
         print (__FUNCTION__)
+        selectedLineIndex = nil
         for touch in touches {
             let location = touch.locationInView(self)
             let newLine = Line(begin: location, end: location)
@@ -198,6 +250,11 @@ class DrawView : UIView {
         print (__FUNCTION__)
         currentLine.removeAll()
         setNeedsDisplay()
+    }
+    
+    //MARK: - delegates
+    func gestureRecognizer(gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWithGestureRecognizer otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
     
     //MARK: - other override
